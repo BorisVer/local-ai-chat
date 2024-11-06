@@ -1,0 +1,5 @@
+openai
+tk
+Pillow>=9.0.0  # Pillow is the modern fork of PIL
+chardet
+python-dotenv
