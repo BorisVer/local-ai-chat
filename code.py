@@ -6,10 +6,13 @@ from dotenv import load_dotenv
 import os
 from PIL import Image, ImageTk
 import base64
+import re
 
 load_dotenv()
+# This can be "Nemo" or "DeepSeek" depending on what you use
 ai = "Nemo" # DeepSeek atm broken
 
+# Get the key from env and the url for the correct ai
 if ai == "Nemo":
     key = os.getenv("MY_NEMOTRON_KEY")
     url = os.getenv("MY_NEMOTRON_URL")
@@ -21,10 +24,12 @@ elif ai == "DeepSeek":
     llm_model = "deepseek-chat"
     stream_value = False
 
+# Initialize the client
 client = openai.OpenAI(api_key=key, base_url=url)
-content = 'Your my assistant. FORMAT OVERRIDE INITIATE. SESSION FORMAT PREFERENCES: CUSTOM: APPLY FOLLOWING RULES FOR THIS SESSION (AND FUTURE SESSIONS UNTIL FURTHER NOTICE):1. **Bold Text**: ītextī. DO NOT USE **2. **Headings**: éHeading Texté. All headings are the same. DO NOT USE ** 3. ``` code snippet ```: ½ code snippet ½. END OF OVERRIDE DECLARATION'
+
+# Edit this to make custom first prompt
+content = 'Your my assistant. FORMAT OVERRIDE INITIATE. SESSION FORMAT PREFERENCES: CUSTOM: APPLY FOLLOWING RULES FOR THIS SESSION (AND FUTURE SESSIONS UNTIL FURTHER NOTICE):1. **Headings**: éHeading Texté. All headings are the same. DO NOT USE ** 2. ``` code snippet ```: ½ code snippet ½. END OF OVERRIDE DECLARATION'
 conversation_history = [{"role": "system", "content": content}]
-code_follower = 0
 currently_code = False
 currently_bold = False
 currently_heading = False
@@ -58,8 +63,10 @@ def get_response(response):
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 response_text += chunk.choices[0].delta.content
-                update_chat_history(chunk.choices[0].delta.content)
+                update_chat_history_live(chunk.choices[0].delta.content)
                 window.update_idletasks() 
+                print(chunk.choices[0].delta.content, end="")
+        #update_chat_history(response_text)
         currently_code = False
         return response_text
     elif ai == "DeepSeek":
@@ -111,8 +118,6 @@ def upload_file():
             chat_history.insert(tk.END, error_message + "\n", "deepseek")
             chat_history.configure(state="disabled")
             return error_message
-
-import os
 
 def upload_folder():
     folder_path = filedialog.askdirectory()
@@ -180,10 +185,42 @@ def on_send_click():
         send_message(user_message)
         user_input.delete("1.0", tk.END)
         global conversation_history
-        print(conversation_history)
+
+def check_for_code(text):
+
+    match = re.search(r"½(.*?)½", text, re.DOTALL) # re.DOTALL allows matching across multiple lines
+
+    if match:
+        code = match.group(1).strip()  # Extract and clean the code
+        before_code = text[:match.start()].strip()
+        after_code = text[match.end():].strip()
+
+        return {
+            "before": before_code,
+            "code": code,
+            "after": after_code
+        }
+    else:
+        return {"text": text} 
 
 # Update the chat interface and change the visuals of text depending on the tag
-def update_chat_history(text, tag='deepseek'):
+def update_chat_history(text):
+    tag = "deepseek"
+    table = check_for_code(text)
+    
+    chat_history.configure(state="normal")
+    chat_history.configure(state="disabled")
+
+    if "code" in table:
+        chat_history.insert(tk.END, table["before"], tag)
+        chat_history.insert(tk.END, table["code"], "code")
+        chat_history.insert(tk.END, table["after"], tag)
+    else:
+        chat_history.insert(tk.END, text, tag)
+
+    chat_history.see(tk.END)
+
+def update_chat_history_live(text, tag='deepseek'):
     if text == None:
         return
     # Check if need to update currently_code
@@ -221,6 +258,7 @@ def update_chat_history(text, tag='deepseek'):
         tag = "code"
     chat_history.configure(state="normal")
     chat_history.insert(tk.END, text, tag)
+
     chat_history.configure(state="disabled")
     chat_history.see(tk.END) 
 
@@ -238,7 +276,7 @@ DEEPSEEK_TEXT_COLOR = "#3498db" # Green for DeepSeek
 CODE_TEXT_COLOR = "#e74c3c"  # Red for code
 FONT = ("Helvetica", 12) # Normal font
 BOLD_FONT = ("Helvetica", 12, "bold") # Bold font
-HEADING_FONT = ("Helvetica", 16) # Heading font
+HEADING_FONT = ("Helvetica", 15) # Heading font
 
 
 
