@@ -8,6 +8,20 @@ from PIL import Image, ImageTk
 import base64
 import re
 
+"""
+To-do
+
+-   Make different size headings work
+-   Make the buttons not be fucked
+-   Make the folder actually also input all subfolders
+-   Make a limit to chat history and make it adjustable
+-   Make a selector to swap ai on the fly
+-   Actually fix the DeepSeek
+-   Let it upload images if Nemo is in use, not if DeepSeek
+
+"""
+
+
 load_dotenv()
 # This can be "Nemo" or "DeepSeek" depending on what you use
 ai = "Nemo" # DeepSeek atm broken
@@ -49,10 +63,10 @@ def send_message(message, image_data=None):
         messages=conversation_history,
         stream=stream_value
     )
-    deepseek_message = get_response(response)
+    ai_message = get_response(response)
     print("Sending step 3: Answer recieved, done")
-    conversation_history.append({"role": "assistant", "content": deepseek_message})
-    return deepseek_message
+    conversation_history.append({"role": "assistant", "content": ai_message})
+    return ai_message
 
 # Get response with code depending on the ai in use
 def get_response(response):
@@ -70,10 +84,18 @@ def get_response(response):
         currently_code = False
         return response_text
     elif ai == "DeepSeek":
-        update_chat_history(response.choices[0].message.content)
-        window.update_idletasks() 
-        return response.choices[0].message.content
-
+        response_text = ""
+        global currently_code
+        update_chat_history(ai + ": ")
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                response_text += chunk.choices[0].delta.content
+                update_chat_history_live(chunk.choices[0].delta.content)
+                window.update_idletasks() 
+                print(chunk.choices[0].delta.content, end="")
+        #update_chat_history(response_text)
+        currently_code = False
+        return response_text
 
 def upload_file():
     file_path = filedialog.askopenfilename()
@@ -82,7 +104,7 @@ def upload_file():
             if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
                 print("Error: Image sending not yet working")
                 return None
-                # Handle image files for sending to DeepSeek
+                # Handle image files for sending 
                 with open(file_path, "rb") as image_file:
                     encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
 
@@ -94,7 +116,7 @@ def upload_file():
                 chat_history.insert(tk.END, "\n")
                 chat_history.image = photo
 
-                deepseek_message = send_message(f"User uploaded an image: {file_path}", encoded_image)  # 
+                ai_message = send_message(f"User uploaded an image: {file_path}", encoded_image)  # 
 
             else:
                 # Handle text files
@@ -105,17 +127,17 @@ def upload_file():
 
                 with open(file_path, 'r', encoding=encoding) as file:
                     file_content = file.read()
-                deepseek_message = ("File uploaded: " + file_path + "\n" + file_content)
+                ai_message = ("File uploaded: " + file_path + "\n" + file_content)
 
-            conversation_history.append({"role": "assistant", "content": deepseek_message})
+            conversation_history.append({"role": "assistant", "content": ai_message})
             print("File uploaded")
-            return deepseek_message
+            return ai_message
 
         except Exception as e:
             print(f"Error: {e}")
             error_message = "Error reading or processing file: " + str(e)
             chat_history.configure(state="normal")
-            chat_history.insert(tk.END, error_message + "\n", "deepseek")
+            chat_history.insert(tk.END, error_message + "\n", "ai")
             chat_history.configure(state="disabled")
             return error_message
 
@@ -130,7 +152,7 @@ def upload_folder():
                         if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')):
                             print("Error: Image sending not yet working")
                             continue
-                            # Handle image files for sending to DeepSeek
+                            # Handle image files for sending
                             with open(file_path, "rb") as image_file:
                                 encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
 
@@ -142,7 +164,7 @@ def upload_folder():
                             chat_history.insert(tk.END, "\n")
                             chat_history.image = photo
 
-                            deepseek_message = send_message(f"User uploaded an image: {file_path}", encoded_image)
+                            ai_message = send_message(f"User uploaded an image: {file_path}", encoded_image)
 
                         else:
                             # Handle text files
@@ -153,23 +175,23 @@ def upload_folder():
 
                             with open(file_path, 'r', encoding=encoding) as file:
                                 file_content = file.read()
-                            deepseek_message = ("File uploaded: " + file_path + "\n" + file_content)
+                            ai_message = ("File uploaded: " + file_path + "\n" + file_content)
 
-                        conversation_history.append({"role": "assistant", "content": deepseek_message})
+                        conversation_history.append({"role": "assistant", "content": ai_message})
                         print("File uploaded")
 
                     except Exception as e:
                         print(f"Error processing file {file_path}: {e}")
                         error_message = "Error reading or processing file: " + str(e)
                         chat_history.configure(state="normal")
-                        chat_history.insert(tk.END, error_message + "\n", "deepseek")
+                        chat_history.insert(tk.END, error_message + "\n", "ai")
                         chat_history.configure(state="disabled")
 
         except Exception as e:
             print(f"Error: {e}")
             error_message = "Error reading or processing folder: " + str(e)
             chat_history.configure(state="normal")
-            chat_history.insert(tk.END, error_message + "\n", "deepseek")
+            chat_history.insert(tk.END, error_message + "\n", "ai")
             chat_history.configure(state="disabled")
 
     print("Entire Folder Uploaded")
@@ -205,7 +227,7 @@ def check_for_code(text):
 
 # Update the chat interface and change the visuals of text depending on the tag
 def update_chat_history(text):
-    tag = "deepseek"
+    tag = "ai"
     table = check_for_code(text)
     
     chat_history.configure(state="normal")
@@ -220,7 +242,7 @@ def update_chat_history(text):
 
     chat_history.see(tk.END)
 
-def update_chat_history_live(text, tag='deepseek'):
+def update_chat_history_live(text, tag='ai'):
     if text == None:
         return
     # Check if need to update currently_code
@@ -272,13 +294,11 @@ def clear_chat_history():
 # --- Styling ---
 BG_COLOR = "#F5F5F5"  # Light gray background
 USER_TEXT_COLOR = "#27ae60"  # Blue for user
-DEEPSEEK_TEXT_COLOR = "#3498db" # Green for DeepSeek
+AI_TEXT_COLOR = "#3498db" # Green for Ai
 CODE_TEXT_COLOR = "#e74c3c"  # Red for code
 FONT = ("Helvetica", 12) # Normal font
 BOLD_FONT = ("Helvetica", 12, "bold") # Bold font
 HEADING_FONT = ("Helvetica", 15) # Heading font
-
-
 
 # Create main window
 window = tk.Tk()
@@ -288,10 +308,10 @@ window.configure(bg=BG_COLOR)  # Set background color for the whole window
 # Chat history display
 chat_history = scrolledtext.ScrolledText(window, wrap=tk.WORD, state="disabled", bg=BG_COLOR, font=FONT, borderwidth=0)
 chat_history.tag_configure("user", foreground=USER_TEXT_COLOR, font=FONT)
-chat_history.tag_configure("deepseek", foreground=DEEPSEEK_TEXT_COLOR, font=FONT)
+chat_history.tag_configure("ai", foreground=AI_TEXT_COLOR, font=FONT)
 chat_history.tag_configure("code", foreground=CODE_TEXT_COLOR, font=("Courier", 12))  # Monospace font for code
-chat_history.tag_configure("bold", foreground=DEEPSEEK_TEXT_COLOR, font=BOLD_FONT)  # Monospace font for bold
-chat_history.tag_configure("heading", foreground=DEEPSEEK_TEXT_COLOR, font=HEADING_FONT)
+chat_history.tag_configure("bold", foreground=AI_TEXT_COLOR, font=BOLD_FONT)  # Monospace font for bold
+chat_history.tag_configure("heading", foreground=AI_TEXT_COLOR, font=HEADING_FONT)
 chat_history.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
 # User input area
