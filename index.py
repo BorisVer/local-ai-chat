@@ -42,11 +42,13 @@ elif ai == "DeepSeek":
 client = openai.OpenAI(api_key=key, base_url=url)
 
 # Edit this to make custom first prompt
-content = 'Your my assistant. FORMAT OVERRIDE INITIATE. SESSION FORMAT PREFERENCES: CUSTOM: APPLY FOLLOWING RULES FOR THIS SESSION (AND FUTURE SESSIONS UNTIL FURTHER NOTICE):1. **Headings**: éHeading Texté. All headings are the same. DO NOT USE ** 2. ``` code snippet ```: ½ code snippet ½. END OF OVERRIDE DECLARATION'
+content = 'Your my assistant. FORMAT OVERRIDE INITIATE. SESSION FORMAT PREFERENCES: CUSTOM: APPLY FOLLOWING RULES FOR THIS SESSION (AND FUTURE SESSIONS UNTIL FURTHER NOTICE):1. **Headings**: éHeading Texté. Use ë for subheadings and ê for sub-subheadings. 2. ``` code snippet ```: ½ code snippet ½. 3. ī BOLD ī: ī Bold text ī.  END OF OVERRIDE DECLARATION'
 conversation_history = [{"role": "system", "content": content}]
 currently_code = False
 currently_bold = False
 currently_heading = False
+currently_sub_heading = False
+currently_sub_sub_heading = False
 
 def send_message(message, image_data=None):
     print("Sendnig step 1: Start message sending process")
@@ -73,17 +75,18 @@ def get_response(response):
     if ai == "Nemo":
         response_text = ""
         global currently_code
-        update_chat_history(ai + ": ")
+        update_chat_history_live(ai + ": ")
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 response_text += chunk.choices[0].delta.content
                 update_chat_history_live(chunk.choices[0].delta.content)
                 window.update_idletasks() 
-                print(chunk.choices[0].delta.content, end="")
+                print(chunk.choices[0].delta.content, end="\n")
         #update_chat_history(response_text)
         currently_code = False
         return response_text
-    elif ai == "DeepSeek":
+    
+    """elif ai == "DeepSeek":
         response_text = ""
         global currently_code
         update_chat_history(ai + ": ")
@@ -95,7 +98,7 @@ def get_response(response):
                 print(chunk.choices[0].delta.content, end="")
         #update_chat_history(response_text)
         currently_code = False
-        return response_text
+        return response_text"""
 
 def upload_file():
     file_path = filedialog.askopenfilename()
@@ -225,8 +228,8 @@ def check_for_code(text):
     else:
         return {"text": text} 
 
-# Update the chat interface and change the visuals of text depending on the tag
-def update_chat_history(text):
+# IGNORE FOR NOW
+def update_chat_history(text): 
     tag = "ai"
     table = check_for_code(text)
     
@@ -272,8 +275,28 @@ def update_chat_history_live(text, tag='ai'):
         else:
             currently_heading = True
             return 
+    elif "ë" in text:
+        global currently_sub_heading
+        if currently_sub_heading:
+            currently_sub_heading = False
+            return
+        else:
+            currently_sub_heading = True
+            return 
+    elif "ê" in text:
+        global currently_sub_sub_heading
+        if currently_sub_sub_heading:
+            currently_sub_sub_heading = False
+            return
+        else:
+            currently_sub_sub_heading = True
+            return   
     if currently_heading:
         tag = "heading"
+    if currently_sub_heading:
+        tag = "subheading"
+    if currently_sub_sub_heading:
+        tag = "subsubheading"
     if currently_bold:
         tag = "bold"
     if currently_code:
@@ -298,7 +321,10 @@ AI_TEXT_COLOR = "#3498db" # Green for Ai
 CODE_TEXT_COLOR = "#e74c3c"  # Red for code
 FONT = ("Helvetica", 12) # Normal font
 BOLD_FONT = ("Helvetica", 12, "bold") # Bold font
-HEADING_FONT = ("Helvetica", 15) # Heading font
+HEADING_FONT = ("Helvetica", 18) # Heading font
+HEADING_SUB_FONT = ("Helvetica", 16) # Heading font
+HEADING_SUB_SUB_FONT = ("Helvetica", 14) # Heading font
+
 
 # Create main window
 window = tk.Tk()
@@ -312,6 +338,8 @@ chat_history.tag_configure("ai", foreground=AI_TEXT_COLOR, font=FONT)
 chat_history.tag_configure("code", foreground=CODE_TEXT_COLOR, font=("Courier", 12))  # Monospace font for code
 chat_history.tag_configure("bold", foreground=AI_TEXT_COLOR, font=BOLD_FONT)  # Monospace font for bold
 chat_history.tag_configure("heading", foreground=AI_TEXT_COLOR, font=HEADING_FONT)
+chat_history.tag_configure("subheading", foreground=AI_TEXT_COLOR, font=HEADING_SUB_FONT)
+chat_history.tag_configure("subsubheading", foreground=AI_TEXT_COLOR, font=HEADING_SUB_SUB_FONT)
 chat_history.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
 # User input area
